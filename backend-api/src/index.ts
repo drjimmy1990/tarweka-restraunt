@@ -1,34 +1,26 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import apiRoutes from './routes/api'; // <--- Import Routes
 
-// 1. Load Environment Variables
 dotenv.config();
 
-// 2. Initialize App
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// 3. Middleware
-app.use(cors()); // Allow Frontend to talk to Backend
-app.use(express.json()); // Parse JSON bodies
-app.use(morgan('dev')); // Log requests
+app.use(cors());
+app.use(express.json());
+app.use(morgan('dev'));
 
-// 4. Basic Test Route
-app.get('/', (req: Request, res: Response) => {
-    res.status(200).json({
-        message: '✅ Geo-Aware RMS Backend is Running!',
-        timestamp: new Date().toISOString(),
-        env: process.env.NODE_ENV
-    });
+// Mount the API Routes
+app.use('/api', apiRoutes); // <--- Use Routes
+
+// Basic Health Check
+app.get('/', (req, res) => {
+    res.send('Geo-Aware RMS Backend is Running');
 });
 
-// 5. Start Server
 app.listen(PORT, () => {
-    console.log(`
-  ################################################
-  🚀 Server listening on http://localhost:${PORT}
-  ################################################
-  `);
+    console.log(`🚀 Server listening on http://localhost:${PORT}`);
 });
