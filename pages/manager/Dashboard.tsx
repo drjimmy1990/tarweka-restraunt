@@ -211,8 +211,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     <button
       onClick={() => setFilterStatus(status)}
       className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${filterStatus === status
-          ? 'bg-blue-600 text-white shadow-md'
-          : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+        ? 'bg-blue-600 text-white shadow-md'
+        : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
         }`}
     >
       {label}
@@ -331,7 +331,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   <h3 className="text-lg font-bold text-gray-800 mb-1 truncate">{order.customer_name}</h3>
                   <div className="flex items-center text-gray-600 text-sm gap-2 mb-1">
                     <Phone className="w-4 h-4 flex-shrink-0" />
-                    <p dir="ltr" className="font-mono">{order.customer_phone}</p>
+                    <p className="font-mono"><span dir="ltr">{order.customer_phone}</span></p>
                   </div>
                   <div className="flex items-start text-gray-500 text-sm gap-2">
                     <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -553,7 +553,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                         </div>
                         <div>
                           <p className="text-gray-500 text-sm">Phone</p>
-                          <p className="font-bold text-lg text-gray-800 font-mono" dir="ltr">{selectedOrder.customer_phone}</p>
+                          <p className="font-bold text-lg text-gray-800 font-mono"><span dir="ltr">{selectedOrder.customer_phone}</span></p>
                         </div>
                         <div>
                           <p className="text-gray-500 text-sm">Address</p>
