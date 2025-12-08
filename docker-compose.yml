@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend-api
+      dockerfile: Dockerfile
+    container_name: rms-backend
+    restart: always
+    ports:
+      - "4000:4000"
+    # Inject env vars from the backend .env file at Runtime
+    env_file:
+      - ./backend-api/.env
+    environment:
+      - PORT=4000
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Inject env vars from the root .env file at Build Time
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    container_name: rms-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
