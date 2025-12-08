@@ -20,7 +20,7 @@ export interface Zone {
 }
 
 export interface User {
-  id: number;
+  id: string | number;
   username: string;
   role: UserRole;
   full_name: string;
@@ -61,7 +61,7 @@ export interface Order {
   delivery_fee: number;
   total_price: number;
   status: OrderStatus;
-  
+
   // Timestamps
   created_at: string;
   accepted_at?: string;
@@ -73,7 +73,7 @@ export interface Order {
   // Robustness / Exception Handling
   cancellation_reason?: string;
   customer_alert_message?: string; // For "unusual conditions" notifications
-  
+
   // Modifications
   modificationRequest?: ModificationRequest;
 }
