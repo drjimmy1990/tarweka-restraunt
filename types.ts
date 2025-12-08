@@ -1,37 +1,33 @@
+// ==========================================
+// ENUMS & TYPES
+// ==========================================
 
-export enum UserRole {
-  SUPER_ADMIN = 'super_admin',
-  BRANCH_MANAGER = 'branch_manager'
-}
+// We use String Unions instead of Enums for better Supabase compatibility
+export type OrderStatus = 'pending' | 'accepted' | 'in_kitchen' | 'out_for_delivery' | 'done' | 'cancelled';
+export type UserRole = 'super_admin' | 'branch_manager';
 
-export enum OrderStatus {
-  PENDING = 'pending',
-  ACCEPTED = 'accepted',
-  IN_KITCHEN = 'in_kitchen',
-  OUT_FOR_DELIVERY = 'out_for_delivery',
-  DONE = 'done',
-  CANCELLED = 'cancelled'
+// ==========================================
+// GEOSPATIAL TYPES
+// ==========================================
+export interface Point {
+  lat: number;
+  lng: number;
 }
 
 export interface Zone {
   name: string;
   delivery_fee: number;
-  polygon: [number, number][]; // Array of [lat, lon]
+  polygon: Point[];
 }
 
-export interface User {
-  id: string | number;
-  username: string;
-  role: UserRole;
-  full_name: string;
-  branch_id?: number; // Optional: links manager to a branch
-}
+// ==========================================
+// DATABASE TABLES
+// ==========================================
 
 export interface Branch {
   id: number;
-  manager_id?: number;
   name: string;
-  phone_contact: string;
+  phone_contact?: string;
   zones: Zone[];
   is_active: boolean;
   created_at: string;
@@ -41,6 +37,7 @@ export interface OrderItem {
   name: string;
   qty: number;
   price: number;
+  options?: string[];
 }
 
 export interface ModificationRequest {
@@ -51,16 +48,31 @@ export interface ModificationRequest {
 
 export interface Order {
   id: number;
+  daily_seq: number;
   branch_id: number;
+
+  // Customer Info
   customer_name: string;
   customer_phone: string;
-  address_text: string;
+  customer_lat?: number;
+  customer_lng?: number;
+  address_text?: string;
+
+  // Content
   items: OrderItem[];
-  notes?: string;
+  kitchen_notes?: string;
+
+  // Financials
   subtotal: number;
   delivery_fee: number;
   total_price: number;
+
   status: OrderStatus;
+
+  // Exception Handling
+  cancellation_reason?: string;
+  customer_alert_message?: string;
+  modification_request?: ModificationRequest | null;
 
   // Timestamps
   created_at: string;
@@ -69,19 +81,20 @@ export interface Order {
   out_for_delivery_at?: string;
   done_at?: string;
   cancelled_at?: string;
+}
 
-  // Robustness / Exception Handling
-  cancellation_reason?: string;
-  customer_alert_message?: string; // For "unusual conditions" notifications
-
-  // Modifications
-  modificationRequest?: ModificationRequest;
+export interface User {
+  id: string | number; // Supports UUID (Supabase) and Number (Legacy)
+  username: string;
+  role: UserRole;
+  full_name: string;
+  branch_id?: number;
 }
 
 export interface AnalyticsData {
   totalRevenue: number;
   totalOrders: number;
-  avgDeliveryTime: number; // in minutes
+  avgDeliveryTime: number;
   avgOrderValue: number;
   revenuePerBranch: { name: string; revenue: number }[];
   ordersPerHour: { hour: string; count: number }[];

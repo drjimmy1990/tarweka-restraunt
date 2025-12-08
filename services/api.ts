@@ -51,7 +51,7 @@ export const api = {
   getOrders: async (branchId?: number): Promise<Order[]> => {
     let query = supabase
       .from('orders')
-      .select('*')
+      .select('*, customers(full_name, phone_number), customer_addresses(address_text, latitude, longitude)')
       .order('created_at', { ascending: false });
 
     // If Manager (branchId exists), filter. If Admin (branchId undefined), fetch all.
@@ -66,7 +66,14 @@ export const api = {
       return [];
     }
 
-    return data as Order[];
+    return data.map((order: any) => ({
+      ...order,
+      customer_name: order.customers?.full_name || 'Apps Customer',
+      customer_phone: order.customers?.phone_number || 'N/A',
+      address_text: order.customer_addresses?.address_text || 'Pick Up',
+      customer_lat: order.customer_addresses?.latitude,
+      customer_lng: order.customer_addresses?.longitude
+    })) as Order[];
   },
 
   updateOrderStatus: async (orderId: number, status: OrderStatus): Promise<void> => {

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { isPointInPolygon } from '../utils/geoUtils';
 import { Branch, Zone } from '../types';
+import { OrderStatus } from '../types'; // Ensure OrderStatus is imported
 
 export const createOrder = async (req: Request, res: Response) => {
     try {
@@ -129,5 +130,85 @@ export const createOrder = async (req: Request, res: Response) => {
     } catch (err: any) {
         console.error('Create Order Error:', err);
         res.status(500).json({ error: err.message || 'Internal Server Error' });
+    }
+};
+
+// ... existing createOrder code ...
+
+// ------------------------------------------
+// NEW: Get Order Details (For Bot Status Check)
+// ------------------------------------------
+export const getOrder = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        const { data: order, error } = await supabase
+            .from('orders')
+            .select('*, branches(name)') // Join branch name
+            .eq('id', id)
+            .single();
+
+        if (error || !order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        res.json({
+            success: true,
+            order
+        });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ------------------------------------------
+// NEW: Update Status (For Bot Actions)
+// ------------------------------------------
+export const updateOrderStatus = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { status, cancellation_reason } = req.body;
+
+        // Validate Status
+        const validStatuses: OrderStatus[] = ['pending', 'accepted', 'in_kitchen', 'out_for_delivery', 'done', 'cancelled'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+        }
+
+        // Prepare Update Data (Handle Timestamps)
+        const updateData: any = { status };
+        const now = new Date().toISOString();
+
+        if (status === 'accepted') updateData.accepted_at = now;
+        if (status === 'in_kitchen') updateData.in_kitchen_at = now;
+        if (status === 'out_for_delivery') updateData.out_for_delivery_at = now;
+        if (status === 'done') updateData.done_at = now;
+
+        // Handle Cancellation
+        if (status === 'cancelled') {
+            updateData.cancelled_at = now;
+            if (cancellation_reason) updateData.cancellation_reason = cancellation_reason;
+        }
+
+        // Execute Update
+        const { data, error } = await supabase
+            .from('orders')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            return res.status(400).json({ error: error.message });
+        }
+
+        res.json({
+            success: true,
+            message: `Order #${id} updated to ${status}`,
+            data
+        });
+
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
     }
 };
