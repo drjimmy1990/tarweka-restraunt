@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { checkCoverage } from '../controllers/geoController';
-import { createOrder, getOrder, updateOrderStatus } from '../controllers/orderController'; // Import new functions
+import { createOrder, getOrder, updateOrderStatus, modifyOrder } from '../controllers/orderController'; // Import new functions
 import { verifyApiKey } from '../middleware/auth';
 
 const router = Router();
@@ -18,5 +18,11 @@ router.get('/orders/:id', verifyApiKey, getOrder);
 
 // 4. Update Order Status (For "Cancel Order" or Driver Bot)
 router.patch('/orders/:id', verifyApiKey, updateOrderStatus);
+
+// 5. Modify Order (New User Request)
+router.post('/orders/:id/modify', verifyApiKey, modifyOrder);
+
+// 6. Explicit Status Update (New User Request - alias for PATCH /orders/:id)
+router.patch('/orders/:id/status', verifyApiKey, updateOrderStatus);
 
 export default router;

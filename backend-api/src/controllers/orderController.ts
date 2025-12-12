@@ -1,28 +1,33 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { isPointInPolygon } from '../utils/geoUtils';
-import { Branch, Zone } from '../types';
-import { OrderStatus } from '../types'; // Ensure OrderStatus is imported
+import { Branch, Zone, OrderStatus } from '../types';
 
 export const createOrder = async (req: Request, res: Response) => {
     try {
         const {
-            customer_phone,
-            customer_name,
-            lat,
-            lng,
-            address_text,
+            customer_id,
+            address_id,
             items,
             kitchen_notes
         } = req.body;
 
-        // 1. Validate Input
-        if (!customer_phone || !items || !items.length || !lat || !lng) {
-            return res.status(400).json({ error: 'Missing required fields' });
+        // 1. Validate IDs exist
+        if (!customer_id || !address_id || !items || !items.length) {
+            return res.status(400).json({ error: 'Missing customer_id, address_id, or items' });
         }
 
-        // 2. Find Coverage (Re-Verify Logic)
-        // We do this again server-side for security.
+        // 2. Fetch Branch & Delivery Fee based on the Address ID
+        // We need to check coverage again using the saved address coordinates to get the fee
+        const { data: address } = await supabase
+            .from('customer_addresses')
+            .select('*')
+            .eq('id', address_id)
+            .single();
+
+        if (!address) return res.status(404).json({ error: 'Address not found' });
+
+        // 3. Find Coverage (Re-Run Ray Casting on saved Lat/Lng)
         const { data: branches } = await supabase
             .from('branches')
             .select('*')
@@ -33,11 +38,11 @@ export const createOrder = async (req: Request, res: Response) => {
 
         if (branches) {
             for (const b of branches) {
-                const branch = b as Branch;
+                // Cast to Branch type safely
+                const branch = b as unknown as Branch;
                 if (!branch.zones) continue;
-
                 for (const zone of branch.zones) {
-                    if (isPointInPolygon({ lat, lng }, zone.polygon)) {
+                    if (isPointInPolygon({ lat: address.latitude, lng: address.longitude }, zone.polygon)) {
                         selectedBranch = branch;
                         deliveryFee = zone.delivery_fee;
                         break;
@@ -48,76 +53,31 @@ export const createOrder = async (req: Request, res: Response) => {
         }
 
         if (!selectedBranch) {
-            return res.status(400).json({
-                error: 'Out of Delivery Area',
-                message: 'This location is not covered by any active branch.'
-            });
+            return res.status(400).json({ error: 'Address location is no longer in delivery zone' });
         }
 
-        // 3. Handle Customer (Upsert)
-        // We check if phone exists. If yes, update name. If no, create.
-        const { data: customer, error: custError } = await supabase
-            .from('customers')
-            .upsert(
-                { phone_number: customer_phone, full_name: customer_name },
-                { onConflict: 'phone_number' }
-            )
-            .select()
-            .single();
-
-        if (custError || !customer) {
-            throw new Error(`Customer Error: ${custError?.message}`);
-        }
-
-        // 4. Create Address Entry
-        const { data: address, error: addrError } = await supabase
-            .from('customer_addresses')
-            .insert({
-                customer_id: customer.id,
-                address_text: address_text || 'Pinned Location',
-                latitude: lat,
-                longitude: lng,
-                is_default: true
-            })
-            .select()
-            .single();
-
-        if (addrError) {
-            throw new Error(`Address Error: ${addrError.message}`);
-        }
-
-        // 5. Calculate Financials
+        // 4. Calculate Subtotal
         const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.qty), 0);
 
-        // 6. Insert Order
-        // Note: 'total_price' is generated automatically by DB, we don't send it.
-        // Note: 'daily_seq' is generated automatically by DB Trigger.
+        // 5. Insert Order
+        // Note: We use type assertion for 'any' to bypass partial type mismatch if existing DB types are strict without full fields
         const { data: order, error: orderError } = await supabase
             .from('orders')
             .insert({
                 branch_id: selectedBranch.id,
-                customer_id: customer.id,
-                address_id: address.id,
+                customer_id: customer_id,
+                address_id: address_id,
                 items: items,
                 kitchen_notes: kitchen_notes,
                 subtotal: subtotal,
                 delivery_fee: deliveryFee,
-                status: 'pending',
-                // Redundant but useful fields for history (Excluded as they are not in the provided schema)
-                // customer_name: customer_name,
-                // customer_phone: customer_phone,
-                // delivery_address: address_text,
-                // delivery_lat: lat,
-                // delivery_lng: lng
+                status: 'pending'
             })
             .select()
             .single();
 
-        if (orderError) {
-            throw new Error(`Order Creation Error: ${orderError.message}`);
-        }
+        if (orderError) throw orderError;
 
-        // 7. Success Response
         res.status(201).json({
             success: true,
             order_id: order.id,
@@ -129,15 +89,10 @@ export const createOrder = async (req: Request, res: Response) => {
 
     } catch (err: any) {
         console.error('Create Order Error:', err);
-        res.status(500).json({ error: err.message || 'Internal Server Error' });
+        res.status(500).json({ error: err.message });
     }
 };
 
-// ... existing createOrder code ...
-
-// ------------------------------------------
-// NEW: Get Order Details (For Bot Status Check)
-// ------------------------------------------
 export const getOrder = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
@@ -152,8 +107,21 @@ export const getOrder = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Order not found' });
         }
 
+        // Translate status for Arabic context if needed (optional helper)
+        const statusMap: Record<string, string> = {
+            'pending': '⏳ معلق',
+            'accepted': '✅ مقبول',
+            'in_kitchen': '👨‍🍳 بيجهز في المطبخ',
+            'out_for_delivery': '🛵 خرج للتوصيل',
+            'done': '🎉 تم التوصيل',
+            'cancelled': '❌ ملغي'
+        };
+
+        const statusArabic = statusMap[order.status] || order.status;
+
         res.json({
             success: true,
+            status_arabic: statusArabic,
             order
         });
     } catch (err: any) {
@@ -161,22 +129,60 @@ export const getOrder = async (req: Request, res: Response) => {
     }
 };
 
-// ------------------------------------------
-// NEW: Update Status (For Bot Actions)
-// ------------------------------------------
+export const modifyOrder = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { items, notes } = req.body;
+
+        if (!items && !notes) {
+            return res.status(400).json({ error: 'No changes provided' });
+        }
+
+        const updateData: any = {};
+        if (items) updateData.items = items;
+        if (notes) updateData.kitchen_notes = notes;
+
+        // Recalculate subtotal if items change
+        if (items) {
+            const subtotal = items.reduce((sum: number, item: any) => sum + (item.price * item.qty), 0);
+            updateData.subtotal = subtotal;
+        }
+
+        const { data, error } = await supabase
+            .from('orders')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            message: 'Order modification requested',
+            order: data
+        });
+
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
 export const updateOrderStatus = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const { status, cancellation_reason } = req.body;
+        const { status, cancellation_reason, reason } = req.body;
 
         // Validate Status
         const validStatuses: OrderStatus[] = ['pending', 'accepted', 'in_kitchen', 'out_for_delivery', 'done', 'cancelled'];
-        if (!validStatuses.includes(status)) {
+        if (status && !validStatuses.includes(status)) {
             return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
         }
 
         // Prepare Update Data (Handle Timestamps)
-        const updateData: any = { status };
+        const updateData: any = {};
+        if (status) updateData.status = status;
+
         const now = new Date().toISOString();
 
         if (status === 'accepted') updateData.accepted_at = now;
@@ -187,7 +193,9 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
         // Handle Cancellation
         if (status === 'cancelled') {
             updateData.cancelled_at = now;
-            if (cancellation_reason) updateData.cancellation_reason = cancellation_reason;
+            // Support both parameter names
+            const finalReason = cancellation_reason || reason;
+            if (finalReason) updateData.cancellation_reason = finalReason;
         }
 
         // Execute Update

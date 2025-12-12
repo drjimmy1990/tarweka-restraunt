@@ -40,3 +40,80 @@ Server Key: 'my_super_secret_n8n_password' (Length: 28)
 Client Key: 'my_super_secret_n8n_password' (Length: 28)
 Match: true
 ------------------------------------------------
+
+[2025-12-12T13:51:03.478Z] Request to /check-coverage
+Headers: {"accept":"application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7","host":"localhost:4000","user-agent":"axios/1.12.0","accept-encoding":"gzip, compress, deflate, br","x-request-id":"c46d0c9b5fe26c65af40a60ac6439fcd","x-real-ip":"82.208.21.164","x-forwarded-port":"443","x-forwarded-scheme":"https","x-original-uri":"/api/check-coverage","x-scheme":"https","x-api-key":"my_super_secret_n8n_password","x-forwarded-proto":"https","x-forwarded-host":"84dwfbd8-4000.euw.devtunnels.ms","x-forwarded-for":"82.208.21.164","proxy-connection":"Keep-Alive","content-type":"application/json","content-length":"39"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T13:53:38.883Z] Request to /check-coverage
+Headers: {"accept":"application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7","host":"localhost:4000","user-agent":"axios/1.12.0","accept-encoding":"gzip, compress, deflate, br","x-request-id":"fb851fb7a97eba1f657692012001dc63","x-real-ip":"82.208.21.164","x-forwarded-port":"443","x-forwarded-scheme":"https","x-original-uri":"/api/check-coverage","x-scheme":"https","x-api-key":"my_super_secret_n8n_password","x-forwarded-proto":"https","x-forwarded-host":"84dwfbd8-4000.euw.devtunnels.ms","x-forwarded-for":"82.208.21.164","proxy-connection":"Keep-Alive","content-type":"application/json","content-length":"29"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T14:11:24.744Z] Request to /check-coverage
+Headers: {"accept":"application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7","host":"localhost:4000","user-agent":"axios/1.12.0","accept-encoding":"gzip, compress, deflate, br","x-request-id":"e9103371c4629fe9137da4d3c47a3857","x-real-ip":"82.208.21.164","x-forwarded-port":"443","x-forwarded-scheme":"https","x-original-uri":"/api/check-coverage","x-scheme":"https","x-api-key":"my_super_secret_n8n_password","x-forwarded-proto":"https","x-forwarded-host":"84dwfbd8-4000.euw.devtunnels.ms","x-forwarded-for":"82.208.21.164","proxy-connection":"Keep-Alive","content-type":"application/json","content-length":"29"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T15:00:53.361Z] Request to /orders
+Headers: {"accept":"application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7","host":"localhost:4000","user-agent":"axios/1.12.0","accept-encoding":"gzip, compress, deflate, br","x-request-id":"b9fc6c51ba545793de66732203b3115a","x-real-ip":"82.208.21.164","x-forwarded-port":"443","x-forwarded-scheme":"https","x-original-uri":"/api/orders","x-scheme":"https","x-api-key":"my_super_secret_n8n_password","x-forwarded-proto":"https","x-forwarded-host":"84dwfbd8-4000.euw.devtunnels.ms","x-forwarded-for":"82.208.21.164","proxy-connection":"Keep-Alive","content-type":"application/json","content-length":"82"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T15:23:19.436Z] Request to /check-coverage
+Headers: {"accept":"application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7","host":"localhost:4000","user-agent":"axios/1.12.0","accept-encoding":"gzip, compress, deflate, br","x-request-id":"d1e5751342a7d27469042081cb6d4f0b","x-real-ip":"82.208.21.164","x-forwarded-port":"443","x-forwarded-scheme":"https","x-original-uri":"/api/check-coverage","x-scheme":"https","x-api-key":"my_super_secret_n8n_password","x-forwarded-proto":"https","x-forwarded-host":"84dwfbd8-4000.euw.devtunnels.ms","x-forwarded-for":"82.208.21.164","proxy-connection":"Keep-Alive","content-type":"application/json","content-length":"29"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T15:31:39.890Z] Request to /check-coverage
+Headers: {"accept":"application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7","host":"localhost:4000","user-agent":"axios/1.12.0","accept-encoding":"gzip, compress, deflate, br","x-request-id":"203ad4a8e765067dd6d60ad9d224a366","x-real-ip":"82.208.21.164","x-forwarded-port":"443","x-forwarded-scheme":"https","x-original-uri":"/api/check-coverage","x-scheme":"https","x-api-key":"my_super_secret_n8n_password","x-forwarded-proto":"https","x-forwarded-host":"84dwfbd8-4000.euw.devtunnels.ms","x-forwarded-for":"82.208.21.164","proxy-connection":"Keep-Alive","content-type":"application/json","content-length":"29"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T20:07:58.253Z] Request to /orders
+Headers: {"accept":"application/json, text/plain, */*","content-type":"application/json","x-api-key":"my_super_secret_n8n_password","user-agent":"axios/1.13.2","content-length":"149","accept-encoding":"gzip, compress, deflate, br","host":"localhost:4000","connection":"keep-alive"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T20:08:39.076Z] Request to /orders
+Headers: {"accept":"application/json, text/plain, */*","content-type":"application/json","x-api-key":"my_super_secret_n8n_password","user-agent":"axios/1.13.2","content-length":"149","accept-encoding":"gzip, compress, deflate, br","host":"localhost:4000","connection":"keep-alive"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T20:08:39.591Z] Request to /orders/2
+Headers: {"accept":"application/json, text/plain, */*","x-api-key":"my_super_secret_n8n_password","user-agent":"axios/1.13.2","accept-encoding":"gzip, compress, deflate, br","host":"localhost:4000","connection":"keep-alive"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T20:08:39.701Z] Request to /orders/2/modify
+Headers: {"accept":"application/json, text/plain, */*","content-type":"application/json","x-api-key":"my_super_secret_n8n_password","user-agent":"axios/1.13.2","content-length":"86","accept-encoding":"gzip, compress, deflate, br","host":"localhost:4000","connection":"keep-alive"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
+
+[2025-12-12T20:08:39.812Z] Request to /orders/2/status
+Headers: {"accept":"application/json, text/plain, */*","content-type":"application/json","x-api-key":"my_super_secret_n8n_password","user-agent":"axios/1.13.2","content-length":"23","accept-encoding":"gzip, compress, deflate, br","host":"localhost:4000","connection":"keep-alive"}
+Server Key: 'my_super_secret_n8n_password' (Length: 28)
+Client Key: 'my_super_secret_n8n_password' (Length: 28)
+Match: true
+------------------------------------------------
