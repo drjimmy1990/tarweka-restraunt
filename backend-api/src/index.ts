@@ -1,10 +1,10 @@
+import dotenv from 'dotenv';
+dotenv.config(); // Load env vars before other imports
+
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import apiRoutes from './routes/api'; // <--- Import Routes
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;

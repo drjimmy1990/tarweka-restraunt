@@ -5,7 +5,11 @@ import { Branch, CoverageResponse, Zone } from '../types';
 
 export const checkCoverage = async (req: Request, res: Response) => {
     try {
-        const { lat, lng } = req.body;
+        let { lat, lng } = req.body;
+
+        // Ensure they are numbers (in case n8n sends strings)
+        lat = parseFloat(lat);
+        lng = parseFloat(lng);
 
         // 1. Validation
         if (!isValidCoordinate(lat, lng)) {
