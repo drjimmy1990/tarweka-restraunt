@@ -63,7 +63,13 @@ npm run dev
 ```
 *   The backend will start at `http://localhost:4000`.
 
-### 2. Setup Frontend
+### 2. Running Full System Test
+We have included a script to simulate a full order lifecycle (Create -> Track -> Modify -> Update Status) using live DB data.
+```bash
+npx ts-node src/scripts/full_test.ts
+```
+
+### 3. Setup Frontend
 Open a new terminal in the root directory:
 ```bash
 npm install
@@ -101,19 +107,16 @@ curl -X POST http://localhost:4000/api/check-coverage \
 ```
 
 ### 2. Create Order
-Creates a new order, registering the customer and address if they don't exist.
+Creates a new order using existing Customer and Address IDs (typically obtained from previous steps or the `customer_addresses` table).
 
 *   **Endpoint**: `POST /orders`
 *   **Headers**: `x-api-key: <your_key>`
 *   **Body**:
     ```json
     {
-      "customer_phone": "966500000000",
-      "customer_name": "John Doe",
-      "lat": 24.7136,
-      "lng": 46.6753,
-      "address_text": "Olaya Street, Building 5",
-      "kitchen_notes": "No spicy sauce",
+      "customer_id": 12,
+      "address_id": 5,
+      "kitchen_notes": "Extra crispy fries",
       "items": [
         { "name": "Burger", "qty": 2, "price": 25 },
         { "name": "Fries", "qty": 1, "price": 10 }
@@ -127,11 +130,10 @@ curl -X POST http://localhost:4000/api/orders \
   -H "Content-Type: application/json" \
   -H "x-api-key: my-secret-key" \
   -d '{
-    "customer_phone": "966500000000",
-    "customer_name": "Test User",
-    "lat": 24.7136,
-    "lng": 46.6753,
-    "items": [{"name": "Shawarma", "qty": 2, "price": 15}]
+    "customer_id": 12,
+    "address_id": 5,
+    "items": [{"name": "Shawarma", "qty": 2, "price": 15}],
+    "kitchen_notes": "Garlic sauce on side"
   }'
 ```
 
@@ -147,7 +149,30 @@ curl -X GET http://localhost:4000/api/orders/123 \
   -H "x-api-key: my-secret-key"
 ```
 
-### 4. Update Order Status
+### 4. Modify Order
+Request changes to an existing order (items or notes).
+
+*   **Endpoint**: `POST /orders/:id/modify`
+*   **Headers**: `x-api-key: <your_key>`
+*   **Body** (Only include fields to update):
+    ```json
+    {
+      "items": [
+        { "name": "Burger", "qty": 3, "price": 25 }
+      ],
+      "notes": "Changed mind, extra chilly"
+    }
+    ```
+
+**Example Curl**:
+```bash
+curl -X POST http://localhost:4000/api/orders/123/modify \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: my-secret-key" \
+  -d '{ "notes": "Please hurry" }'
+```
+
+### 5. Update Order Status
 Update an order's status. Useful for Driver bots or Cancellation flows.
 
 *   **Endpoint**: `PATCH /orders/:id`
@@ -168,6 +193,8 @@ curl -X PATCH http://localhost:4000/api/orders/123 \
   -H "x-api-key: my-secret-key" \
   -d '{"status": "cancelled", "cancellation_reason": "Testing bot"}'
 ```
+
+*   **Alternative Endpoint**: `PATCH /orders/:id/status` (Identical behavior, distinct URL for routing logic).
 
 ---
 
