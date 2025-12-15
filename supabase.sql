@@ -188,6 +188,10 @@ VALUES ('Main Branch', '01012345678', '[]');
 
 
 
+
+
+
+
 -- =============================================
 -- 14. ADMIN PERMISSIONS (CRITICAL FIXES)
 -- =============================================
@@ -210,3 +214,62 @@ CREATE POLICY "Enable delete for authenticated users" ON "public"."branches"
 AS PERMISSIVE FOR DELETE
 TO authenticated
 USING (true);
+
+
+
+
+
+
+
+-- Function to get comprehensive customer context by phone number
+create or replace function get_customer_context(phone_input text)
+returns json
+language plpgsql
+security definer -- Runs with admin privileges to read data
+as $$
+declare
+    cust_record record;
+    addr_list json;
+    active_ord json;
+    result json;
+begin
+    -- 1. Get Customer Details
+    select * into cust_record from customers where phone_number = phone_input;
+
+    -- If customer does not exist, return a specific structure
+    if not found then
+        return json_build_object(
+            'found', false,
+            'message', 'User not found'
+        );
+    end if;
+
+    -- 2. Get All Addresses for this customer
+    select coalesce(json_agg(t), '[]'::json) into addr_list
+    from (
+        select * from customer_addresses 
+        where customer_id = cust_record.id
+        order by is_default desc, created_at desc
+    ) t;
+
+    -- 3. Get the ONE Current Active Order (Newest first, excluding done/cancelled)
+    select row_to_json(t) into active_ord
+    from (
+        select * from orders
+        where customer_id = cust_record.id
+        and status not in ('done', 'cancelled')
+        order by created_at desc
+        limit 1
+    ) t;
+
+    -- 4. Build the Final JSON Response
+    result := json_build_object(
+        'found', true,
+        'customer', row_to_json(cust_record),
+        'addresses', addr_list,
+        'active_order', active_ord 
+    );
+
+    return result;
+end;
+$$;
