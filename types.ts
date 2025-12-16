@@ -37,6 +37,7 @@ export interface OrderItem {
   name: string;
   qty: number;
   price: number;
+  size?: string;
   options?: string[];
 }
 
@@ -72,6 +73,7 @@ export interface Order {
   // Exception Handling
   cancellation_reason?: string;
   customer_alert_message?: string;
+  modification_pending?: boolean;
   modification_request?: ModificationRequest | null;
 
   // Timestamps

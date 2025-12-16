@@ -5,6 +5,16 @@ import { useI18n } from '../../i18n';
 import { Clock, MapPin, CheckCircle, Truck, PackageCheck, ChefHat, AlertCircle, Phone, Search, Eye, X, MessageSquareWarning, Ban, RotateCcw, AlertTriangle, Pencil, Save, PlusCircle, Trash, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
+// Helper to play sound safely
+const playNotificationSound = () => {
+  try {
+    const audio = new Audio('/alert.mp3');
+    audio.play().catch(e => console.log('Audio play blocked:', e));
+  } catch (err) {
+    console.error('Audio Error:', err);
+  }
+};
+
 interface DashboardProps {
   user: User;
 }
@@ -27,19 +37,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [editItems, setEditItems] = useState<OrderItem[]>([]);
   const [editNotes, setEditNotes] = useState('');
 
-  const { t, language } = useI18n();
+  const { t, language, dir } = useI18n();
 
-  // Load Data
-  const fetchOrders = async () => {
+  // Load Data Function
+  const fetchOrders = async (isUpdate = false) => { // isUpdate param is now unused for sound
     if (!user.branch_id) return;
     try {
       const data = await api.getOrders(user.branch_id);
-
-      // Retrieve active orders (Pending -> Out for Delivery)
-      // Done/Cancelled are usually filtered out from the main board
       const branchOrders = data.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
       setOrders(branchOrders);
+      // Removed playNotificationSound() from here entirely
     } catch (err) {
       console.error("Dashboard Error:", err);
     } finally {
@@ -47,24 +54,45 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     }
   };
 
+  // Initial Load & Realtime Subscription
   useEffect(() => {
     fetchOrders();
 
-    // REALTIME SUBSCRIPTION (Replaces setInterval)
     const channel = supabase
       .channel('kds-realtime')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: '*', // Listen to everything
           schema: 'public',
           table: 'orders',
           filter: `branch_id=eq.${user.branch_id}`
         },
-        () => {
-          // When DB changes, refresh the list
-          console.log("Realtime update received!");
-          fetchOrders();
+        (payload) => {
+          // LOGIC: Play sound ONLY if meaningful change
+          let shouldPlaySound = false;
+
+          if (payload.eventType === 'INSERT') {
+            // New Order -> Ding!
+            shouldPlaySound = true;
+          }
+          else if (payload.eventType === 'UPDATE') {
+            // Only if a NEW modification request arrived
+            // (Old value was false/null, New value is true)
+            const oldPending = payload.old.modification_pending;
+            const newPending = payload.new.modification_pending;
+
+            if (!oldPending && newPending) {
+              shouldPlaySound = true;
+            }
+          }
+
+          if (shouldPlaySound) {
+            playNotificationSound();
+          }
+
+          // Always refresh data to stay synced
+          fetchOrders(false); // Pass false to prevent double sound from fetch
         }
       )
       .subscribe();
@@ -86,22 +114,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       default: return;
     }
 
-    // Optimistic UI update (Instant feedback)
+    // Optimistic UI update
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
 
-    // Update Modal if open
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(prev => prev ? { ...prev, status: nextStatus } : null);
     }
 
-    // Send to DB
     await api.updateOrderStatus(orderId, nextStatus);
   };
 
   const handleCancelOrder = async () => {
     if (showCancelModal && cancelReason) {
       await api.cancelOrder(showCancelModal, cancelReason);
-      setOrders(prev => prev.filter(o => o.id !== showCancelModal)); // Remove from view
+      setOrders(prev => prev.filter(o => o.id !== showCancelModal));
       if (selectedOrder?.id === showCancelModal) setSelectedOrder(null);
       setShowCancelModal(null);
       setCancelReason('');
@@ -111,24 +137,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const handleSendAlert = async () => {
     if (showAlertModal && alertMessage) {
       await api.sendCustomerAlert(showAlertModal, alertMessage);
-      // Refresh to get updated data
       fetchOrders();
       setShowAlertModal(null);
       setAlertMessage('');
     }
   };
 
-  // Modification Logic
   const handleModificationResponse = async (orderId: number, action: 'accept' | 'decline') => {
-    await api.resolveOrderModification(orderId, action);
-    fetchOrders(); // Refresh to see changes
-    if (selectedOrder?.id === orderId) setSelectedOrder(null); // Close modal to refresh details
+    // 1. Optimistic Update (Immediate Feedback)
+    setOrders(prev => prev.map(o =>
+      o.id === orderId
+        ? { ...o, modification_pending: false, modification_request: null }
+        : o
+    ));
+
+    // 2. Close Modal
+    if (selectedOrder?.id === orderId) {
+      setSelectedOrder(null);
+    }
+
+    // 3. Send to Backend
+    try {
+      await api.resolveOrderModification(orderId, action);
+    } catch (e) {
+      console.error("Resolve Error:", e);
+      fetchOrders(); // Revert on error
+    }
   };
 
   const handleStartEdit = () => {
     if (!selectedOrder) return;
     setEditItems([...selectedOrder.items]);
-    setEditNotes(selectedOrder.notes || '');
+    setEditNotes(selectedOrder.kitchen_notes || '');
     setIsEditing(true);
   };
 
@@ -232,11 +272,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       {/* Controls Bar */}
       <div className="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
-          <Search className="absolute top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 right-3 rtl:right-auto rtl:left-3" />
+          <Search className={`absolute top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 ${dir === 'rtl' ? 'right-3' : 'left-3'}`} />
           <input
             type="text"
             placeholder={t('kds.search_placeholder')}
-            className="w-full pl-4 pr-10 rtl:pr-4 rtl:pl-10 py-3 rounded-xl border border-gray-200 shadow-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className={`w-full py-3 rounded-xl border border-gray-200 shadow-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'}`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -267,13 +307,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <div key={order.id} className={`relative bg-white rounded-xl shadow-lg border-2 overflow-hidden flex flex-col h-full transition-all hover:shadow-xl ${order.status === 'pending' ? 'border-yellow-400 animate-pulse-slow' : 'border-transparent'}`}>
 
               {/* MODIFICATION OVERLAY */}
-              {order.modification_request && (
-                <div className="absolute inset-0 z-20 bg-orange-500/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-white text-center animate-fade-in">
+              {order.modification_pending && (
+                <div className="absolute inset-0 z-20 bg-orange-600/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-white text-center animate-fade-in">
                   <div className="bg-white/20 p-4 rounded-full mb-4 animate-bounce">
                     <AlertTriangle className="w-8 h-8 text-white" />
                   </div>
                   <h3 className="text-xl font-bold mb-2">{t('mod.alert')}</h3>
-                  <p className="text-sm opacity-90 mb-6">Agent requested changes to items/notes.</p>
+                  <div className="text-sm opacity-90 mb-4 bg-black/20 p-2 rounded w-full">
+                    <p className="font-bold mb-1">Requested Items:</p>
+                    <ul className="text-xs text-left rtl:text-right space-y-1">
+                      {order.modification_request?.items.map((it: OrderItem, i: number) => (
+                        <li key={i}>• {it.qty}x {it.name} {it.size ? `(${it.size})` : ''}</li>
+                      ))}
+                    </ul>
+                    {order.modification_request?.notes && (
+                      <p className="mt-2 text-xs italic bg-white/10 p-1 rounded">"{order.modification_request.notes}"</p>
+                    )}
+                  </div>
                   <div className="flex flex-col gap-3 w-full">
                     <button
                       onClick={() => handleModificationResponse(order.id, 'accept')}
@@ -283,7 +333,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                     </button>
                     <button
                       onClick={() => handleModificationResponse(order.id, 'decline')}
-                      className="bg-orange-700/50 text-white py-3 rounded-lg font-bold hover:bg-orange-700"
+                      className="bg-orange-800/50 text-white py-3 rounded-lg font-bold hover:bg-orange-800"
                     >
                       {t('mod.decline')}
                     </button>
@@ -295,8 +345,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <div className={`px-4 py-3 flex justify-between items-center ${getStatusColor(order.status)}`}>
                 <span className="font-bold text-lg">#{order.id}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
+                  <span className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
                     {new Date(order.created_at).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <div className="flex gap-1">
@@ -339,28 +389,31 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   </div>
                 </div>
 
-                <div className="flex-1 bg-gray-50 rounded-lg p-3 mb-4 border border-gray-100">
+                <div className="flex-1 bg-gray-50 rounded-lg p-2 mb-4 border border-gray-100 text-sm">
                   <ul className="space-y-2">
                     {order.items.slice(0, 3).map((item, idx) => (
-                      <li key={idx} className="flex justify-between items-center text-sm">
-                        <span className="flex items-center gap-2">
-                          <span className="bg-white border border-gray-200 w-6 h-6 flex items-center justify-center rounded text-xs font-bold text-gray-700">
-                            {item.qty}x
+                      <li key={idx} className="flex justify-between items-start">
+                        <div className="flex items-start gap-2">
+                          <span className="bg-white border border-gray-200 w-5 h-5 flex items-center justify-center rounded text-xs font-bold text-gray-700 shadow-sm flex-shrink-0 mt-0.5">
+                            {item.qty}
                           </span>
-                          <span className="text-gray-800 font-medium truncate max-w-[120px]">{item.name}</span>
-                        </span>
+                          <div className="flex flex-col">
+                            <span className="text-gray-800 font-medium leading-tight">{item.name}</span>
+                            {item.size && <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded-md w-fit mt-0.5 border border-blue-100">{item.size}</span>}
+                          </div>
+                        </div>
                       </li>
                     ))}
                     {order.items.length > 3 && (
                       <li className="text-xs text-center text-gray-400 pt-1">
-                        + {order.items.length - 3} عناصر أخرى...
+                        + {order.items.length - 3} more...
                       </li>
                     )}
                   </ul>
                   {order.kitchen_notes && (
-                    <div className="mt-3 pt-3 border-t border-dashed border-gray-200 text-red-500 text-sm flex gap-2">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      <span className="truncate">{order.kitchen_notes}</span>
+                    <div className="mt-2 pt-2 border-t border-dashed border-gray-200 text-red-600 text-xs flex gap-1 font-semibold bg-red-50 p-1 rounded">
+                      <AlertCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                      <span className="break-words">{order.kitchen_notes}</span>
                     </div>
                   )}
                   {order.customer_alert_message && (
@@ -371,13 +424,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   )}
                 </div>
 
-                <div className="mb-4 pt-2 border-t border-gray-100">
+                <div className="mb-3 pt-2 border-t border-gray-100">
                   <div className="flex justify-between items-center text-gray-800 font-bold text-lg">
-                    <span>{t('common.currency')} {order.total_price}</span>
-                    <div className="text-sm font-normal text-gray-500 flex flex-col items-end">
-                      <span className="text-xs">Sub: {order.subtotal}</span>
-                      <span className="text-xs">+ Del: {order.delivery_fee}</span>
-                    </div>
+                    <span>{order.total_price} {t('common.currency')}</span>
                   </div>
                 </div>
 
@@ -508,9 +557,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                           }}
                           className="w-16 p-2 border rounded text-center font-bold"
                         />
-                        <div className="flex-1">
+                        <div className="flex-1 space-y-2">
                           <input
                             type="text"
+                            placeholder="Item Name"
                             value={item.name}
                             onChange={(e) => {
                               const newArr = [...editItems];
@@ -518,6 +568,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                               setEditItems(newArr);
                             }}
                             className="w-full p-2 border rounded bg-white"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Size (Optional)"
+                            value={item.size || ''}
+                            onChange={(e) => {
+                              const newArr = [...editItems];
+                              newArr[idx].size = e.target.value;
+                              setEditItems(newArr);
+                            }}
+                            className="w-full p-2 border rounded bg-gray-50 text-sm"
                           />
                         </div>
                         <button
@@ -586,26 +647,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
                   <div>
                     <h3 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Order Items</h3>
-                    <div className="space-y-3 mb-6">
+                    <ul className="text-sm space-y-2">
                       {selectedOrder.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <span className="bg-white border border-gray-200 w-8 h-8 flex items-center justify-center rounded-lg font-bold text-gray-700 shadow-sm">
+                        <li key={idx} className="flex justify-between items-start p-2 hover:bg-gray-50 rounded transition-colors border-b border-gray-50 last:border-0">
+                          <div className="flex items-start gap-3">
+                            <span className="bg-gray-100 border border-gray-200 w-6 h-6 flex items-center justify-center rounded-md text-xs font-bold text-gray-700 shadow-sm flex-shrink-0 mt-0.5">
                               {item.qty}
                             </span>
-                            <span className="font-bold text-gray-800">{item.name}</span>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-gray-800 leading-tight">
+                                {item.name}
+                              </span>
+                              {item.size && (
+                                <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full w-fit mt-1 border border-blue-100">
+                                  {item.size}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <span className="font-mono font-medium text-gray-600">{item.price * item.qty} {t('common.currency')}</span>
-                        </div>
+                          <span className="font-mono font-medium text-gray-600 text-xs mt-1">
+                            {item.price * item.qty} {t('common.currency')}
+                          </span>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
 
-                    {selectedOrder.notes && (
-                      <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6 flex items-start gap-3">
+                    {selectedOrder.kitchen_notes && (
+                      <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6 flex items-start gap-3 mt-4">
                         <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                         <div>
                           <p className="font-bold text-sm mb-1">Kitchen Notes:</p>
-                          <p>{selectedOrder.notes}</p>
+                          <p>{selectedOrder.kitchen_notes}</p>
                         </div>
                       </div>
                     )}
@@ -650,30 +722,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes pulse-slow {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.4); }
-          50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
-        }
-        .animate-pulse-slow {
-          animation: pulse-slow 3s infinite;
-        }
-        @keyframes scale-in {
-          0% { transform: scale(0.95); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-in {
-          animation: scale-in 0.2s ease-out forwards;
-        }
-        @keyframes fade-in {
-          0% { opacity: 0; }
-          100% { opacity: 1; }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.2s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 // ==========================================
-// ENUMS (Must match Database Enums)
+// ENUMS & TYPES
 // ==========================================
+
 export type OrderStatus = 'pending' | 'accepted' | 'in_kitchen' | 'out_for_delivery' | 'done' | 'cancelled';
 export type UserRole = 'super_admin' | 'branch_manager';
 
@@ -15,7 +16,6 @@ export interface Point {
 export interface Zone {
     name: string;
     delivery_fee: number;
-    // A polygon is an array of Points: [[lat,lng], [lat,lng], ...]
     polygon: Point[];
 }
 
@@ -27,7 +27,7 @@ export interface Branch {
     id: number;
     name: string;
     phone_contact?: string;
-    zones: Zone[]; // Automatically parsed from JSONB
+    zones: Zone[];
     is_active: boolean;
     created_at: string;
 }
@@ -36,21 +36,24 @@ export interface OrderItem {
     name: string;
     qty: number;
     price: number;
+    size?: string;
     options?: string[];
+}
+
+export interface ModificationRequest {
+    items: OrderItem[];
+    notes?: string;
+    requested_at: string;
 }
 
 export interface Order {
     id: number;
     daily_seq: number;
     branch_id: number;
+    customer_id: number;
+    address_id: number;
 
-    // Customer Snapshot
-    customer_name: string;
-    customer_phone: string;
-    customer_lat?: number;
-    customer_lng?: number;
-    address_text?: string;
-
+    // Content
     items: OrderItem[];
     kitchen_notes?: string;
 
@@ -60,6 +63,12 @@ export interface Order {
     total_price: number;
 
     status: OrderStatus;
+
+    // Exception Handling
+    cancellation_reason?: string;
+    customer_alert_message?: string;
+    modification_pending?: boolean;
+    modification_request?: ModificationRequest | null;
 
     // Timestamps
     created_at: string;
@@ -85,4 +94,5 @@ export interface CoverageResponse {
     branch_name?: string;
     zone_name?: string;
     delivery_fee?: number;
+    message?: string;
 }
