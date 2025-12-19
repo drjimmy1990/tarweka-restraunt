@@ -210,7 +210,7 @@ export const api = {
   // ANALYTICS
   // ----------------------------------------------------
   getAnalytics: async (startDate?: string, endDate?: string): Promise<AnalyticsData> => {
-    let query = supabase.from('orders').select('*');
+    let query = supabase.from('orders').select('*, branches(name)');
 
     if (startDate) query = query.gte('created_at', new Date(startDate).toISOString());
     if (endDate) query = query.lte('created_at', new Date(endDate).toISOString());
@@ -221,23 +221,82 @@ export const api = {
       revenuePerBranch: [], ordersPerHour: [], ordersByStatus: [], topItems: []
     };
 
-    const validOrders = orders.filter(o => o.status !== 'cancelled');
-    const totalRevenue = validOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
+    const validOrders = orders.filter((o: any) => o.status !== 'cancelled');
+    const totalRevenue = validOrders.reduce((sum: number, o: any) => sum + (o.total_price || 0), 0);
     const totalOrders = orders.length;
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / validOrders.length : 0;
+    const avgOrderValue = validOrders.length > 0 ? totalRevenue / validOrders.length : 0;
+
+    // Calculate orders per hour
+    const hourCounts: { [hour: string]: number } = {};
+    orders.forEach((order: any) => {
+      const hour = new Date(order.created_at).getHours();
+      const hourKey = `${hour}:00`;
+      hourCounts[hourKey] = (hourCounts[hourKey] || 0) + 1;
+    });
+    const ordersPerHour = Array.from({ length: 24 }, (_, i) => ({
+      hour: `${i}:00`,
+      count: hourCounts[`${i}:00`] || 0
+    }));
+
+    // Calculate orders by status
+    const statusColors: { [status: string]: string } = {
+      pending: '#F59E0B',
+      accepted: '#3B82F6',
+      in_kitchen: '#8B5CF6',
+      out_for_delivery: '#06B6D4',
+      done: '#10B981',
+      cancelled: '#EF4444'
+    };
+    const ordersByStatus = Object.entries(
+      orders.reduce((acc: any, order: any) => {
+        acc[order.status] = (acc[order.status] || 0) + 1;
+        return acc;
+      }, {})
+    ).map(([name, value]) => ({
+      name,
+      value: value as number,
+      color: statusColors[name] || '#6B7280'
+    }));
+
+    // Calculate top items
+    const itemCounts: { [name: string]: { sales: number; revenue: number } } = {};
+    validOrders.forEach((order: any) => {
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          const name = item.name || 'Unknown Item';
+          if (!itemCounts[name]) {
+            itemCounts[name] = { sales: 0, revenue: 0 };
+          }
+          itemCounts[name].sales += item.qty || 1;
+          itemCounts[name].revenue += (item.price || 0) * (item.qty || 1);
+        });
+      }
+    });
+    const topItems = Object.entries(itemCounts)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    // Calculate revenue per branch
+    const branchRevenue: { [branchName: string]: number } = {};
+    validOrders.forEach((order: any) => {
+      const branchName = order.branches?.name || 'Unknown Branch';
+      branchRevenue[branchName] = (branchRevenue[branchName] || 0) + (order.total_price || 0);
+    });
+    const revenuePerBranch = Object.entries(branchRevenue).map(([name, revenue]) => ({
+      name,
+      revenue
+    }));
 
     return {
       totalRevenue,
       totalOrders,
-      avgDeliveryTime: 30,
+      avgDeliveryTime: 30, // TODO: Calculate from delivery timestamps
       avgOrderValue,
-      revenuePerBranch: [],
-      ordersPerHour: [],
-      ordersByStatus: [
-        { name: 'done', value: orders.filter(o => o.status === 'done').length, color: '#10B981' },
-        { name: 'cancelled', value: orders.filter(o => o.status === 'cancelled').length, color: '#EF4444' }
-      ],
-      topItems: []
+      revenuePerBranch,
+      ordersPerHour,
+      ordersByStatus,
+      topItems
     };
   }
 };
