@@ -74,16 +74,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onConnectionStatusChange })
   const [editItems, setEditItems] = useState<OrderItem[]>([]);
   const [editNotes, setEditNotes] = useState('');
 
-  // Dismissed cancelled orders (persisted in localStorage)
-  const [dismissedCancelledOrders, setDismissedCancelledOrders] = useState<Set<number>>(() => {
-    try {
-      const stored = localStorage.getItem('dismissed_cancelled_orders');
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-
   const { t, language, dir } = useI18n();
 
   // Load Data Function
@@ -381,7 +371,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onConnectionStatusChange })
       order.id.toString().includes(searchTerm);
 
     const matchesStatus = filterStatus === 'ALL'
-      ? order.status !== 'done' && !dismissedCancelledOrders.has(order.id) // Show active orders excluding dismissed cancelled
+      ? order.status !== 'done' && !order.cancellation_dismissed // Show active orders excluding dismissed cancelled
       : order.status === filterStatus;
 
     return matchesSearch && matchesStatus;
@@ -518,11 +508,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onConnectionStatusChange })
                     </p>
                   )}
                   <button
-                    onClick={() => {
-                      const newDismissed = new Set(dismissedCancelledOrders);
-                      newDismissed.add(order.id);
-                      setDismissedCancelledOrders(newDismissed);
-                      localStorage.setItem('dismissed_cancelled_orders', JSON.stringify(Array.from(newDismissed)));
+                    onClick={async () => {
+                      try {
+                        await api.dismissCancelledOrder(order.id);
+                        // Update local state to hide immediately
+                        setOrders(prev => prev.map(o =>
+                          o.id === order.id ? { ...o, cancellation_dismissed: true } : o
+                        ));
+                      } catch (error) {
+                        console.error('Failed to dismiss cancelled order:', error);
+                      }
                     }}
                     className="bg-white text-red-600 py-3 px-6 rounded-lg font-bold hover:bg-gray-100 shadow-lg w-full"
                   >

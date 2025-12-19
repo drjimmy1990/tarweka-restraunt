@@ -72,6 +72,7 @@ export interface Order {
 
   // Exception Handling
   cancellation_reason?: string;
+  cancellation_dismissed?: boolean;
   customer_alert_message?: string;
   modification_pending?: boolean;
   modification_request?: ModificationRequest | null;

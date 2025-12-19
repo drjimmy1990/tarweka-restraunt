@@ -273,3 +273,22 @@ begin
     return result;
 end;
 $$;
+
+
+
+
+
+
+
+-- Migration: Add cancellation_dismissed column to orders table
+-- Purpose: Track when cancelled order notifications have been dismissed by managers
+-- This replaces the localStorage-based approach with a database solution
+ALTER TABLE public.orders 
+ADD COLUMN IF NOT EXISTS cancellation_dismissed BOOLEAN DEFAULT FALSE;
+-- Add index for performance when filtering dismissed cancellations
+CREATE INDEX IF NOT EXISTS idx_orders_cancellation_dismissed 
+ON public.orders(cancellation_dismissed) 
+WHERE status = 'cancelled';
+-- Comment for documentation
+COMMENT ON COLUMN public.orders.cancellation_dismissed IS 
+'Tracks if managers have dismissed the cancellation notification for this order';

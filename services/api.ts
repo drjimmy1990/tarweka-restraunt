@@ -101,6 +101,15 @@ export const api = {
     if (error) throw error;
   },
 
+  dismissCancelledOrder: async (orderId: number): Promise<void> => {
+    const { error } = await supabase
+      .from('orders')
+      .update({ cancellation_dismissed: true })
+      .eq('id', orderId);
+
+    if (error) throw error;
+  },
+
   sendCustomerAlert: async (orderId: number, message: string): Promise<void> => {
     const { error } = await supabase
       .from('orders')
