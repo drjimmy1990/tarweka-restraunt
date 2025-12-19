@@ -85,6 +85,13 @@ const translations: Record<Language, Record<string, string>> = {
     'mod.save_changes': 'حفظ وإرسال للمطبخ',
     'mod.add_item': 'إضافة صنف',
     'mod.notes_label': 'ملاحظات المطبخ',
+    'cancel.alert': 'تم إلغاء الطلب!',
+    'cancel.reason_label': 'سبب الإلغاء:',
+    'cancel.by_system': 'ملغي بواسطة النظام',
+    'cancel.timestamp': 'وقت الإلغاء:',
+    'realtime.connected': 'متصل',
+    'realtime.disconnected': 'انقطع الاتصال - إعادة المحاولة...',
+    'realtime.reconnected': 'تم إعادة الاتصال',
   },
   en: {
     'app.title': 'Restaurant OS',
@@ -160,6 +167,13 @@ const translations: Record<Language, Record<string, string>> = {
     'mod.save_changes': 'Save & Send to Kitchen',
     'mod.add_item': 'Add Item',
     'mod.notes_label': 'Kitchen Notes',
+    'cancel.alert': 'Order Cancelled!',
+    'cancel.reason_label': 'Cancellation Reason:',
+    'cancel.by_system': 'Cancelled by System',
+    'cancel.timestamp': 'Cancelled at:',
+    'realtime.connected': 'Connected',
+    'realtime.disconnected': 'Connection Lost - Reconnecting...',
+    'realtime.reconnected': 'Reconnected',
   }
 };
 

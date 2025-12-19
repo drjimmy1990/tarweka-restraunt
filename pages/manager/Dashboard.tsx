@@ -6,24 +6,61 @@ import { Clock, MapPin, CheckCircle, Truck, PackageCheck, ChefHat, AlertCircle, 
 import { supabase } from '../../lib/supabase';
 
 // Helper to play sound safely
+let audioEnabled = false;
+let audioElement: HTMLAudioElement | null = null;
+
+const initializeAudio = () => {
+  if (!audioEnabled) {
+    try {
+      audioElement = new Audio('/alert.mp3');
+      audioElement.volume = 0.7;
+      // Pre-load the audio
+      audioElement.load();
+      audioEnabled = true;
+      console.log('✅ Audio enabled - sounds will now play for notifications');
+    } catch (err) {
+      console.error('❌ Failed to initialize audio:', err);
+    }
+  }
+};
+
 const playNotificationSound = () => {
   try {
-    const audio = new Audio('/alert.mp3');
-    audio.play().catch(e => console.log('Audio play blocked:', e));
+    if (!audioEnabled || !audioElement) {
+      console.warn('⚠️ Audio not initialized yet - please click anywhere on the page first');
+      return;
+    }
+
+    console.log('🔔 Playing notification sound...');
+    // Clone and play to allow multiple concurrent sounds
+    const sound = audioElement.cloneNode() as HTMLAudioElement;
+    sound.volume = 0.7;
+    sound.play()
+      .then(() => {
+        console.log('✅ Sound played successfully');
+      })
+      .catch(e => {
+        console.warn('⚠️ Audio play failed:', e.message);
+      });
   } catch (err) {
-    console.error('Audio Error:', err);
+    console.error('❌ Audio Error:', err);
   }
 };
 
 interface DashboardProps {
   user: User;
+  onConnectionStatusChange?: (status: 'connected' | 'disconnected' | 'reconnecting') => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onConnectionStatusChange }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+
+  // Connection Status
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
   // Modal States
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -36,6 +73,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editItems, setEditItems] = useState<OrderItem[]>([]);
   const [editNotes, setEditNotes] = useState('');
+
+  // Dismissed cancelled orders (persisted in localStorage)
+  const [dismissedCancelledOrders, setDismissedCancelledOrders] = useState<Set<number>>(() => {
+    try {
+      const stored = localStorage.getItem('dismissed_cancelled_orders');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   const { t, language, dir } = useI18n();
 
@@ -58,7 +105,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   useEffect(() => {
     fetchOrders();
 
-    const channel = supabase
+    let reconnectTimeout: NodeJS.Timeout;
+    let currentChannel = supabase
       .channel('kds-realtime')
       .on(
         'postgres_changes',
@@ -77,12 +125,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             shouldPlaySound = true;
           }
           else if (payload.eventType === 'UPDATE') {
-            // Only if a NEW modification request arrived
-            // (Old value was false/null, New value is true)
             const oldPending = payload.old.modification_pending;
             const newPending = payload.new.modification_pending;
+            const oldStatus = payload.old.status;
+            const newStatus = payload.new.status;
 
+            // NEW modification request arrived
             if (!oldPending && newPending) {
+              shouldPlaySound = true;
+            }
+
+            // NEW: Order was just cancelled
+            if (oldStatus !== 'cancelled' && newStatus === 'cancelled') {
               shouldPlaySound = true;
             }
           }
@@ -92,15 +146,101 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           }
 
           // Always refresh data to stay synced
-          fetchOrders(false); // Pass false to prevent double sound from fetch
+          fetchOrders(false);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Connection health monitoring
+        if (status === 'SUBSCRIBED') {
+          setConnectionStatus('connected');
+          onConnectionStatusChange?.('connected');
+          setReconnectAttempts(0);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setConnectionStatus('disconnected');
+          onConnectionStatusChange?.('disconnected');
+          // Attempt reconnection with exponential backoff
+          const attemptReconnect = () => {
+            if (reconnectAttempts < 10) {
+              setConnectionStatus('reconnecting');
+              onConnectionStatusChange?.('reconnecting');
+              const delay = Math.min(30000, 2000 * Math.pow(2, reconnectAttempts));
+              reconnectTimeout = setTimeout(() => {
+                setReconnectAttempts(prev => prev + 1);
+                // Remove old channel and create new one
+                supabase.removeChannel(currentChannel);
+                currentChannel = createRealtimeChannel();
+              }, delay);
+            }
+          };
+          attemptReconnect();
+        }
+      });
+
+    const createRealtimeChannel = () => {
+      return supabase
+        .channel('kds-realtime-' + Date.now())
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: `branch_id=eq.${user.branch_id}`
+          },
+          (payload) => {
+            let shouldPlaySound = false;
+            if (payload.eventType === 'INSERT') {
+              shouldPlaySound = true;
+            } else if (payload.eventType === 'UPDATE') {
+              const oldPending = payload.old.modification_pending;
+              const newPending = payload.new.modification_pending;
+              const oldStatus = payload.old.status;
+              const newStatus = payload.new.status;
+              if (!oldPending && newPending) {
+                shouldPlaySound = true;
+              }
+              if (oldStatus !== 'cancelled' && newStatus === 'cancelled') {
+                shouldPlaySound = true;
+              }
+            }
+            if (shouldPlaySound) {
+              playNotificationSound();
+            }
+            fetchOrders(false);
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            setConnectionStatus('connected');
+            onConnectionStatusChange?.('connected');
+            setReconnectAttempts(0);
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setConnectionStatus('disconnected');
+            onConnectionStatusChange?.('disconnected');
+          }
+        });
+    };
 
     return () => {
-      supabase.removeChannel(channel);
+      clearTimeout(reconnectTimeout);
+      supabase.removeChannel(currentChannel);
     };
-  }, [user.branch_id]);
+  }, [user.branch_id, reconnectAttempts, t]);
+
+  // Initialize audio on first user click
+  useEffect(() => {
+    const handleFirstClick = () => {
+      initializeAudio();
+      // Remove listener after first click
+      document.removeEventListener('click', handleFirstClick);
+    };
+
+    document.addEventListener('click', handleFirstClick);
+
+    return () => {
+      document.removeEventListener('click', handleFirstClick);
+    };
+  }, []);
 
   const handleStatusChange = async (orderId: number, currentStatus: OrderStatus) => {
     let nextStatus: OrderStatus;
@@ -241,7 +381,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       order.id.toString().includes(searchTerm);
 
     const matchesStatus = filterStatus === 'ALL'
-      ? order.status !== 'done' && order.status !== 'cancelled'
+      ? order.status !== 'done' && !dismissedCancelledOrders.has(order.id) // Show active orders excluding dismissed cancelled
       : order.status === filterStatus;
 
     return matchesSearch && matchesStatus;
@@ -269,6 +409,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   return (
     <div>
+      {/* Connection Status Banner */}
+      {connectionStatus === 'disconnected' && (
+        <div className="fixed top-0 left-0 right-0 bg-red-600 text-white text-center py-2 z-[70] shadow-lg animate-fade-in">
+          <div className="flex items-center justify-center gap-2">
+            <AlertCircle className="w-5 h-5 animate-pulse" />
+            <span className="font-bold">{t('realtime.disconnected')}</span>
+          </div>
+        </div>
+      )}
+      {connectionStatus === 'reconnecting' && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-600 text-white text-center py-2 z-[70] shadow-lg animate-fade-in">
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="font-bold">{t('realtime.disconnected')}</span>
+          </div>
+        </div>
+      )}
+
+
+
       {/* Controls Bar */}
       <div className="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
@@ -338,6 +498,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                       {t('mod.decline')}
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* CANCELLATION OVERLAY */}
+              {order.status === 'cancelled' && (
+                <div className="absolute inset-0 z-20 bg-red-600/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-white text-center animate-fade-in">
+                  <div className="bg-white/20 p-4 rounded-full mb-4">
+                    <Ban className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">{t('cancel.alert')}</h3>
+                  <div className="text-sm opacity-90 mb-4 bg-black/20 p-3 rounded w-full">
+                    <p className="font-bold mb-1">{t('cancel.reason_label')}</p>
+                    <p className="text-xs italic">{order.cancellation_reason || t('cancel.by_system')}</p>
+                  </div>
+                  {order.cancelled_at && (
+                    <p className="text-xs opacity-75 mb-4">
+                      {t('cancel.timestamp')} {new Date(order.cancelled_at).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => {
+                      const newDismissed = new Set(dismissedCancelledOrders);
+                      newDismissed.add(order.id);
+                      setDismissedCancelledOrders(newDismissed);
+                      localStorage.setItem('dismissed_cancelled_orders', JSON.stringify(Array.from(newDismissed)));
+                    }}
+                    className="bg-white text-red-600 py-3 px-6 rounded-lg font-bold hover:bg-gray-100 shadow-lg w-full"
+                  >
+                    {t('kds.close')}
+                  </button>
                 </div>
               )}
 

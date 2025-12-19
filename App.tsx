@@ -13,6 +13,7 @@ const AppContent: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
 
   useEffect(() => {
     try {
@@ -72,7 +73,7 @@ const AppContent: React.FC = () => {
   const renderPage = () => {
     switch (currentPage) {
       case 'manager_dashboard':
-        return user.role === 'branch_manager' ? <Dashboard user={user} /> : <div>Access Denied</div>;
+        return user.role === 'branch_manager' ? <Dashboard user={user} onConnectionStatusChange={setConnectionStatus} /> : <div>Access Denied</div>;
       case 'manager_history':
         return user.role === 'branch_manager' ? <History user={user} /> : <div>Access Denied</div>;
       case 'admin_analytics':
@@ -82,7 +83,7 @@ const AppContent: React.FC = () => {
       case 'admin_orders':
         return user.role === 'super_admin' ? <Orders /> : <div>Access Denied</div>;
       default:
-        return user.role === 'branch_manager' ? <Dashboard user={user} /> : <Analytics />;
+        return user.role === 'branch_manager' ? <Dashboard user={user} onConnectionStatusChange={setConnectionStatus} /> : <Analytics />;
     }
   };
 
@@ -92,6 +93,7 @@ const AppContent: React.FC = () => {
       onLogout={handleLogout}
       activePage={currentPage}
       onNavigate={handleNavigate}
+      connectionStatus={connectionStatus}
     >
       {renderPage()}
     </Layout>

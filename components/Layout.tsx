@@ -10,9 +10,10 @@ interface LayoutProps {
   children: ReactNode;
   activePage: string;
   onNavigate: (page: string) => void;
+  connectionStatus?: 'connected' | 'disconnected' | 'reconnecting';
 }
 
-const Layout: React.FC<LayoutProps> = ({ user, onLogout, children, activePage, onNavigate }) => {
+const Layout: React.FC<LayoutProps> = ({ user, onLogout, children, activePage, onNavigate, connectionStatus = 'connected' }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   // FIX: Compare with string literal instead of Enum
   const isManager = user.role === 'branch_manager';
@@ -131,8 +132,20 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout, children, activePage, o
             {activePage === 'admin_branches' && t('nav.branches')}
             {activePage === 'admin_orders' && t('nav.orders')}
           </h2>
-          <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-            {new Date().toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          <div className="flex items-center gap-3">
+            {/* Connection Status Icon */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full border border-gray-200" title={t(`realtime.${connectionStatus}`)}>
+              <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
+                  connectionStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
+                    'bg-red-500 animate-pulse'
+                }`}></div>
+              <span className="text-xs font-medium text-gray-600 whitespace-nowrap">{t(`realtime.${connectionStatus}`)}</span>
+            </div>
+
+            {/* Date Display */}
+            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+              {new Date().toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
           </div>
         </header>
         <div className="p-8 max-w-7xl mx-auto">
