@@ -528,7 +528,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onConnectionStatusChange })
 
               {/* Header */}
               <div className={`px-4 py-3 flex justify-between items-center ${getStatusColor(order.status)}`}>
-                <span className="font-bold text-lg">#{order.id}</span>
+                <span className="font-bold text-lg">#{order.daily_seq}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-gray-600 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
