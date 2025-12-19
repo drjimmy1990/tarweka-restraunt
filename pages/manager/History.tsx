@@ -43,9 +43,15 @@ const History: React.FC<HistoryProps> = ({ user }) => {
       order.id.toString().includes(searchTerm) ||
       (order.customer_phone || '').includes(searchTerm);
 
-    // If filter is ALL, show everything. Else show exact match.
-    // Default was 'done'.
-    const matchesStatus = filterStatus === 'ALL' ? true : order.status === filterStatus;
+    // Filter logic:
+    // 'active' = pending, accepted, in_kitchen, out_for_delivery (NOT done or cancelled)
+    // 'ALL' = everything
+    // specific status = exact match
+    const matchesStatus = filterStatus === 'active'
+      ? !['done', 'cancelled'].includes(order.status)
+      : filterStatus === 'ALL'
+        ? true
+        : order.status === filterStatus;
 
     let matchesDate = true;
     if (dateRange.start) {
@@ -119,6 +125,7 @@ const History: React.FC<HistoryProps> = ({ user }) => {
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
               >
+                <option value="active">{t('filter.active')}</option>
                 <option value="done">{t('status.done')}</option>
                 <option value="cancelled">{t('status.cancelled')}</option>
                 <option value="ALL">{t('kds.filter_all')}</option>

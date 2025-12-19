@@ -37,7 +37,15 @@ const Orders: React.FC = () => {
       order.id.toString().includes(searchTerm) ||
       (order.customer_phone || '').includes(searchTerm);
 
-    const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
+    // Filter logic:
+    // 'active' = pending, accepted, in_kitchen, out_for_delivery (NOT done or cancelled)
+    // 'all' = everything  
+    // specific status = exact match
+    const matchesStatus = filterStatus === 'active'
+      ? !['done', 'cancelled'].includes(order.status)
+      : filterStatus === 'all'
+        ? true
+        : order.status === filterStatus;
 
     let matchesDate = true;
     if (dateRange.start) {
@@ -109,6 +117,7 @@ const Orders: React.FC = () => {
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
               >
+                <option value="active">{t('filter.active')}</option>
                 <option value="all">{t('kds.filter_all')}</option>
                 <option value="done">{t('status.done')}</option>
                 <option value="cancelled">{t('status.cancelled')}</option>
